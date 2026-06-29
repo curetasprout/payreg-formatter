@@ -353,21 +353,31 @@
 
     <!-- Earnings column selector — shown when split is enabled -->
     <div id="earnings-selector" style="display:none; margin-top:20px;">
-      <div class="col-group-header" style="margin-bottom:8px; padding-bottom:6px; border-bottom:2px solid #e2e8f0;">
+      <div class="col-group-header" style="margin-bottom:8px; padding-bottom:6px; border-bottom:2px solid #e2e8f0; display:flex; align-items:center; gap:12px;">
         <span class="col-group-title earnings">Earnings sheet columns <span id="earn-sel-count"></span></span>
+        <select id="earn-sel-mode" style="margin-left:auto; font-size:13px; padding:3px 8px; border-radius:6px; border:1px solid #cbd5e1; background:#f8fafc; cursor:pointer;">
+          <option value="selected">Selected only</option>
+          <option value="all">All columns</option>
+        </select>
       </div>
-      <p class="desc" style="margin-bottom:10px;">OT/ND/RD overtime columns are excluded. Pre-checked items are recommended earnings to include.</p>
-      <div class="col-group-body">
-        <div class="cols-grid" id="cols-grid-earn-sel"></div>
+      <div id="earn-sel-body">
+        <div class="col-group-body">
+          <div class="cols-grid" id="cols-grid-earn-sel"></div>
+        </div>
       </div>
       <!-- Deductions column selector -->
       <div style="margin-top:20px;">
-        <div class="col-group-header" style="margin-bottom:8px; padding-bottom:6px; border-bottom:2px solid #e2e8f0;">
+        <div class="col-group-header" style="margin-bottom:8px; padding-bottom:6px; border-bottom:2px solid #e2e8f0; display:flex; align-items:center; gap:12px;">
           <span class="col-group-title deductions">Deductions sheet columns <span id="ded-sel-count"></span></span>
+          <select id="ded-sel-mode" style="margin-left:auto; font-size:13px; padding:3px 8px; border-radius:6px; border:1px solid #cbd5e1; background:#f8fafc; cursor:pointer;">
+            <option value="selected">Selected only</option>
+            <option value="all">All columns</option>
+          </select>
         </div>
-        <p class="desc" style="margin-bottom:10px;">Pre-checked from your Step 2 selections. Adjust as needed.</p>
-        <div class="col-group-body">
-          <div class="cols-grid" id="cols-grid-ded-sel"></div>
+        <div id="ded-sel-body">
+          <div class="col-group-body">
+            <div class="cols-grid" id="cols-grid-ded-sel"></div>
+          </div>
         </div>
       </div>
     </div>
@@ -705,10 +715,30 @@
     earnSelCount.textContent = `(${[...cbs].filter(c=>c.checked).length}/${cbs.length})`;
   }
 
+  const earnSelMode = document.getElementById('earn-sel-mode');
+  const earnSelBody = document.getElementById('earn-sel-body');
+  earnSelMode.addEventListener('change', () => {
+    const allMode = earnSelMode.value === 'all';
+    earnSelBody.style.display = allMode ? 'none' : 'block';
+    earnSelCount.textContent = allMode ? '(all)' : (() => { updateEarnSelCount(); return earnSelCount.textContent; })();
+  });
+
+  const dedSelMode  = document.getElementById('ded-sel-mode');
+  const dedSelBody  = document.getElementById('ded-sel-body');
+  dedSelMode.addEventListener('change', () => {
+    const allMode = dedSelMode.value === 'all';
+    dedSelBody.style.display = allMode ? 'none' : 'block';
+    dedSelCount.textContent = allMode ? '(all)' : (() => { updateDedSelCount(); return dedSelCount.textContent; })();
+  });
+
   splitToggle.addEventListener('change', () => {
     const on = splitToggle.checked;
     earningsSelector.style.display = on ? 'block' : 'none';
     if (on && numericColumns.length > 0) {
+      earnSelMode.value = 'selected';
+      earnSelBody.style.display = 'block';
+      dedSelMode.value = 'selected';
+      dedSelBody.style.display = 'block';
       buildEarningsSelectorPanel();
       buildDeductionsSelectorPanel();
     }
@@ -766,6 +796,10 @@
     keepAsIs.checked = false;
     splitToggle.checked = false;
     earningsSelector.style.display = 'none';
+    earnSelMode.value = 'selected';
+    earnSelBody.style.display = 'block';
+    dedSelMode.value = 'selected';
+    dedSelBody.style.display = 'block';
     hideStatus();
   }
 
@@ -817,19 +851,27 @@
     if (doSplit) {
       const data = XLSX.utils.sheet_to_json(srcWs, { header: 1, defval: null });
 
-      // Earnings: user-selected columns from the earnings selector
+      // Earnings: all or user-selected columns
       const earningsColIdxs = [];
-      colsGridEarnSel.querySelectorAll('.col-item input[type=checkbox]:checked').forEach(cb => {
-        const i = parseInt(cb.dataset.earnIdx);
-        if (!isNaN(i) && earningsSelColumns[i]) earningsColIdxs.push(earningsSelColumns[i].colIndex);
-      });
+      if (earnSelMode.value === 'all') {
+        earningsSelColumns.forEach(col => earningsColIdxs.push(col.colIndex));
+      } else {
+        colsGridEarnSel.querySelectorAll('.col-item input[type=checkbox]:checked').forEach(cb => {
+          const i = parseInt(cb.dataset.earnIdx);
+          if (!isNaN(i) && earningsSelColumns[i]) earningsColIdxs.push(earningsSelColumns[i].colIndex);
+        });
+      }
 
-      // Deductions: user-selected columns from the Step 3 deductions selector
+      // Deductions: all or user-selected columns
       const deductionColIdxs = [];
-      colsGridDedSel.querySelectorAll('.col-item input[type=checkbox]:checked').forEach(cb => {
-        const i = parseInt(cb.dataset.dedSelIdx);
-        if (!isNaN(i) && deductionsSelColumns[i]) deductionColIdxs.push(deductionsSelColumns[i].colIndex);
-      });
+      if (dedSelMode.value === 'all') {
+        deductionsSelColumns.forEach(col => deductionColIdxs.push(col.colIndex));
+      } else {
+        colsGridDedSel.querySelectorAll('.col-item input[type=checkbox]:checked').forEach(cb => {
+          const i = parseInt(cb.dataset.dedSelIdx);
+          if (!isNaN(i) && deductionsSelColumns[i]) deductionColIdxs.push(deductionsSelColumns[i].colIndex);
+        });
+      }
 
       const wsE = buildSplitSheet(data, earningsColIdxs, negSet);
       const wsD = buildSplitSheet(data, deductionColIdxs, negSet);
