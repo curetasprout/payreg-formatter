@@ -488,13 +488,68 @@
     }
 
     buildCheckboxPanel();
+    applyStoredChecks(LS_NEG, colsGridDed, updateColCount);
+    applyStoredChecks(LS_NEG + '_earn', colsGridEarn, updateColCount);
     if (splitToggle.checked) {
       buildEarningsSelectorPanel();
+      applyStoredChecks(LS_EARN, colsGridEarnSel, updateEarnSelCount);
       buildDeductionsSelectorPanel();
+      applyStoredChecks(LS_DED, colsGridDedSel, updateDedSelCount);
     }
     step2.style.display = 'block';
     step3.style.display = 'block';
     processBtn.disabled = false;
+  }
+
+  // ─── localStorage preference helpers ────────────────────────────────────────
+  const LS_NEG  = 'payreg_neg_checked';
+  const LS_EARN = 'payreg_earn_sel_checked';
+  const LS_DED  = 'payreg_ded_sel_checked';
+
+  function saveChecked(key, grid) {
+    const checked = [...grid.querySelectorAll('.col-item input[type=checkbox]:checked')]
+      .map(cb => cb.closest('.col-item')?.querySelector('span')?.textContent?.trim())
+      .filter(Boolean);
+    try { localStorage.setItem(key, JSON.stringify(checked)); } catch(e) {}
+  }
+
+  function loadChecked(key) {
+    try { return new Set(JSON.parse(localStorage.getItem(key) || '[]')); } catch(e) { return new Set(); }
+  }
+
+  function applyStoredChecks(key, grid, onChangeFn) {
+    const saved = loadChecked(key);
+    if (!saved.size) return;
+    grid.querySelectorAll('.col-item').forEach(item => {
+      const header = item.querySelector('span')?.textContent?.trim();
+      const cb = item.querySelector('input[type=checkbox]');
+      if (!cb || !header) return;
+      const shouldCheck = saved.has(header);
+      cb.checked = shouldCheck;
+      item.classList.toggle('checked', shouldCheck);
+    });
+    // Sync category checkboxes
+    grid.querySelectorAll('.col-category-label').forEach(catLabel => {
+      const catCb = catLabel.querySelector('input[type=checkbox]');
+      if (!catCb) return;
+      const itemCbs = [...catLabel.nextElementSibling ? [] : []]; // handled below
+    });
+    // Re-derive category states
+    const catLabels = [...grid.querySelectorAll('.col-category-label')];
+    catLabels.forEach(catLabel => {
+      const catCb = catLabel.querySelector('input[type=checkbox]');
+      if (!catCb) return;
+      // Collect all .col-item checkboxes until the next category label
+      const itemCbs = [];
+      let el = catLabel.nextElementSibling;
+      while (el && !el.classList.contains('col-category-label')) {
+        const cb = el.querySelector('input[type=checkbox]');
+        if (cb) itemCbs.push(cb);
+        el = el.nextElementSibling;
+      }
+      updateCatCheckbox(catCb, itemCbs);
+    });
+    onChangeFn();
   }
 
   // ─── Categorization helpers ───────────────────────────────────────────────
@@ -645,6 +700,9 @@
 
     const earnCbs = colsGridEarn.querySelectorAll('.col-item input[type=checkbox]');
     earnCount.textContent = `(${[...earnCbs].filter(c=>c.checked).length}/${earnCbs.length})`;
+
+    saveChecked(LS_NEG, colsGridDed);
+    saveChecked(LS_NEG + '_earn', colsGridEarn);
   }
 
   // Collapse/expand Earnings & Other group in Step 2
@@ -703,6 +761,7 @@
   function updateEarnSelCount() {
     const cbs = colsGridEarnSel.querySelectorAll('.col-item input[type=checkbox]');
     earnSelCount.textContent = `(${[...cbs].filter(c=>c.checked).length}/${cbs.length})`;
+    saveChecked(LS_EARN, colsGridEarnSel);
   }
 
   splitToggle.addEventListener('change', () => {
@@ -710,7 +769,9 @@
     earningsSelector.style.display = on ? 'block' : 'none';
     if (on && numericColumns.length > 0) {
       buildEarningsSelectorPanel();
+      applyStoredChecks(LS_EARN, colsGridEarnSel, updateEarnSelCount);
       buildDeductionsSelectorPanel();
+      applyStoredChecks(LS_DED, colsGridDedSel, updateDedSelCount);
     }
   });
 
@@ -744,6 +805,7 @@
   function updateDedSelCount() {
     const cbs = colsGridDedSel.querySelectorAll('.col-item input[type=checkbox]');
     dedSelCount.textContent = `(${[...cbs].filter(c=>c.checked).length}/${cbs.length})`;
+    saveChecked(LS_DED, colsGridDedSel);
   }
 
 
