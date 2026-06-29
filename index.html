@@ -353,37 +353,21 @@
 
     <!-- Earnings column selector — shown when split is enabled -->
     <div id="earnings-selector" style="display:none; margin-top:20px;">
-      <div class="col-group-header" style="margin-bottom:8px; padding-bottom:6px; border-bottom:2px solid #e2e8f0; display:flex; align-items:center; gap:12px;">
+      <div class="col-group-header" style="margin-bottom:8px; padding-bottom:6px; border-bottom:2px solid #e2e8f0;">
         <span class="col-group-title earnings">Earnings sheet columns <span id="earn-sel-count"></span></span>
-        <label class="toggle-row" style="margin-left:auto; margin-bottom:0;">
-          <span class="toggle-switch" style="width:36px; height:20px;">
-            <input type="checkbox" id="earn-all-toggle">
-            <span class="toggle-slider"></span>
-          </span>
-          <span style="font-size:12px; color:#64748b;">Include all</span>
-        </label>
       </div>
-      <div id="earn-sel-body">
-        <div class="col-group-body">
-          <div class="cols-grid" id="cols-grid-earn-sel"></div>
-        </div>
+      <p class="desc" style="margin-bottom:10px;">OT/ND/RD overtime columns are excluded. Pre-checked items are recommended earnings to include.</p>
+      <div class="col-group-body">
+        <div class="cols-grid" id="cols-grid-earn-sel"></div>
       </div>
       <!-- Deductions column selector -->
       <div style="margin-top:20px;">
-        <div class="col-group-header" style="margin-bottom:8px; padding-bottom:6px; border-bottom:2px solid #e2e8f0; display:flex; align-items:center; gap:12px;">
+        <div class="col-group-header" style="margin-bottom:8px; padding-bottom:6px; border-bottom:2px solid #e2e8f0;">
           <span class="col-group-title deductions">Deductions sheet columns <span id="ded-sel-count"></span></span>
-          <label class="toggle-row" style="margin-left:auto; margin-bottom:0;">
-            <span class="toggle-switch" style="width:36px; height:20px;">
-              <input type="checkbox" id="ded-all-toggle">
-              <span class="toggle-slider"></span>
-            </span>
-            <span style="font-size:12px; color:#64748b;">Include all</span>
-          </label>
         </div>
-        <div id="ded-sel-body">
-          <div class="col-group-body">
-            <div class="cols-grid" id="cols-grid-ded-sel"></div>
-          </div>
+        <p class="desc" style="margin-bottom:10px;">Pre-checked from your Step 2 selections. Adjust as needed.</p>
+        <div class="col-group-body">
+          <div class="cols-grid" id="cols-grid-ded-sel"></div>
         </div>
       </div>
     </div>
@@ -721,40 +705,10 @@
     earnSelCount.textContent = `(${[...cbs].filter(c=>c.checked).length}/${cbs.length})`;
   }
 
-  const earnAllToggle = document.getElementById('earn-all-toggle');
-  const earnSelBody   = document.getElementById('earn-sel-body');
-  earnAllToggle.addEventListener('change', () => {
-    const allMode = earnAllToggle.checked;
-    earnSelBody.style.display = allMode ? 'none' : 'block';
-    if (allMode) {
-      earnSelCount.textContent = '(all)';
-    } else {
-      colsGridEarnSel.querySelectorAll('.col-item input[type=checkbox]').forEach(cb => cb.checked = false);
-      updateEarnSelCount();
-    }
-  });
-
-  const dedAllToggle = document.getElementById('ded-all-toggle');
-  const dedSelBody   = document.getElementById('ded-sel-body');
-  dedAllToggle.addEventListener('change', () => {
-    const allMode = dedAllToggle.checked;
-    dedSelBody.style.display = allMode ? 'none' : 'block';
-    if (allMode) {
-      dedSelCount.textContent = '(all)';
-    } else {
-      colsGridDedSel.querySelectorAll('.col-item input[type=checkbox]').forEach(cb => cb.checked = false);
-      updateDedSelCount();
-    }
-  });
-
   splitToggle.addEventListener('change', () => {
     const on = splitToggle.checked;
     earningsSelector.style.display = on ? 'block' : 'none';
     if (on && numericColumns.length > 0) {
-      earnAllToggle.checked = false;
-      earnSelBody.style.display = 'block';
-      dedAllToggle.checked = false;
-      dedSelBody.style.display = 'block';
       buildEarningsSelectorPanel();
       buildDeductionsSelectorPanel();
     }
@@ -812,10 +766,6 @@
     keepAsIs.checked = false;
     splitToggle.checked = false;
     earningsSelector.style.display = 'none';
-    earnAllToggle.checked = false;
-    earnSelBody.style.display = 'block';
-    dedAllToggle.checked = false;
-    dedSelBody.style.display = 'block';
     hideStatus();
   }
 
@@ -867,27 +817,19 @@
     if (doSplit) {
       const data = XLSX.utils.sheet_to_json(srcWs, { header: 1, defval: null });
 
-      // Earnings: all or user-selected columns
+      // Earnings: user-selected columns from the earnings selector
       const earningsColIdxs = [];
-      if (earnAllToggle.checked) {
-        earningsSelColumns.forEach(col => earningsColIdxs.push(col.colIndex));
-      } else {
-        colsGridEarnSel.querySelectorAll('.col-item input[type=checkbox]:checked').forEach(cb => {
-          const i = parseInt(cb.dataset.earnIdx);
-          if (!isNaN(i) && earningsSelColumns[i]) earningsColIdxs.push(earningsSelColumns[i].colIndex);
-        });
-      }
+      colsGridEarnSel.querySelectorAll('.col-item input[type=checkbox]:checked').forEach(cb => {
+        const i = parseInt(cb.dataset.earnIdx);
+        if (!isNaN(i) && earningsSelColumns[i]) earningsColIdxs.push(earningsSelColumns[i].colIndex);
+      });
 
-      // Deductions: all or user-selected columns
+      // Deductions: user-selected columns from the Step 3 deductions selector
       const deductionColIdxs = [];
-      if (dedAllToggle.checked) {
-        deductionsSelColumns.forEach(col => deductionColIdxs.push(col.colIndex));
-      } else {
-        colsGridDedSel.querySelectorAll('.col-item input[type=checkbox]:checked').forEach(cb => {
-          const i = parseInt(cb.dataset.dedSelIdx);
-          if (!isNaN(i) && deductionsSelColumns[i]) deductionColIdxs.push(deductionsSelColumns[i].colIndex);
-        });
-      }
+      colsGridDedSel.querySelectorAll('.col-item input[type=checkbox]:checked').forEach(cb => {
+        const i = parseInt(cb.dataset.dedSelIdx);
+        if (!isNaN(i) && deductionsSelColumns[i]) deductionColIdxs.push(deductionsSelColumns[i].colIndex);
+      });
 
       const wsE = buildSplitSheet(data, earningsColIdxs, negSet);
       const wsD = buildSplitSheet(data, deductionColIdxs, negSet);
