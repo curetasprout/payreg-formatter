@@ -1,0 +1,1053 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Payroll Register Formatter</title>
+<script src="https://cdn.sheetjs.com/xlsx-0.20.3/package/dist/xlsx.full.min.js"></script>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    background: #f0f4f8;
+    color: #1a202c;
+    min-height: 100vh;
+  }
+
+  header {
+    background: #00A651;
+    color: white;
+    padding: 24px 40px;
+    box-shadow: 0 2px 8px rgba(0,166,81,0.3);
+  }
+  header h1 { font-size: 1.6rem; font-weight: 700; letter-spacing: -0.5px; }
+  header p { margin-top: 4px; font-size: 0.9rem; opacity: 0.85; }
+
+  .container { max-width: 860px; margin: 36px auto; padding: 0 20px 60px; }
+
+  .card {
+    background: white;
+    border-radius: 12px;
+    box-shadow: 0 1px 4px rgba(0,0,0,0.08), 0 4px 16px rgba(0,0,0,0.05);
+    padding: 28px 32px;
+    margin-bottom: 20px;
+  }
+
+  .step-label {
+    display: inline-flex;
+    align-items: center;
+    gap: 10px;
+    font-size: 1.05rem;
+    font-weight: 700;
+    color: #00A651;
+    margin-bottom: 18px;
+  }
+  .step-badge {
+    width: 26px; height: 26px;
+    background: #00A651;
+    color: white;
+    border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 0.78rem; font-weight: 700;
+    flex-shrink: 0;
+  }
+
+  .card h2 { font-size: 1.05rem; font-weight: 600; color: #2d3748; margin-bottom: 6px; }
+  .card p.desc { font-size: 0.85rem; color: #718096; margin-bottom: 18px; }
+
+  /* Upload area */
+  #upload-area {
+    border: 2px dashed #cbd5e0;
+    border-radius: 10px;
+    padding: 40px 24px;
+    text-align: center;
+    cursor: pointer;
+    transition: border-color 0.2s, background 0.2s;
+    background: #f7fafc;
+  }
+  #upload-area:hover, #upload-area.drag-over {
+    border-color: #00A651;
+    background: #f0faf5;
+  }
+  #upload-area svg { color: #00A651; margin-bottom: 12px; }
+  #upload-area .upload-title { font-size: 0.95rem; font-weight: 600; color: #4a5568; }
+  #upload-area .upload-sub { font-size: 0.8rem; color: #a0aec0; margin-top: 4px; }
+  #file-input { display: none; }
+
+  /* File info bar */
+  #file-info {
+    display: none;
+    align-items: center;
+    gap: 12px;
+    background: #f0faf5;
+    border: 1px solid #9ae6b4;
+    border-radius: 8px;
+    padding: 12px 16px;
+    margin-top: 14px;
+    font-size: 0.85rem;
+  }
+  #file-info .fi-icon { color: #00A651; flex-shrink: 0; }
+  #file-info .fi-name { font-weight: 600; color: #2d3748; }
+  #file-info .fi-meta { color: #718096; margin-left: auto; font-size: 0.8rem; }
+  #file-info .fi-clear {
+    background: none; border: none; cursor: pointer;
+    color: #a0aec0; font-size: 1.1rem; line-height: 1;
+    padding: 2px 4px; border-radius: 4px;
+    transition: color 0.15s;
+  }
+  #file-info .fi-clear:hover { color: #e53e3e; }
+
+  /* Step 2 */
+  #step2 { display: none; }
+
+  .keep-as-is-row {
+    display: flex; align-items: center; gap: 10px;
+    padding: 12px 14px;
+    background: #fffbeb;
+    border: 1px solid #fbd38d;
+    border-radius: 8px;
+    margin-bottom: 16px;
+    cursor: pointer;
+  }
+  .keep-as-is-row input[type=checkbox] { width: 16px; height: 16px; accent-color: #d69e2e; cursor: pointer; }
+  .keep-as-is-row label { font-size: 0.88rem; font-weight: 600; color: #744210; cursor: pointer; }
+  .keep-as-is-row .kai-sub { font-size: 0.78rem; color: #975a16; }
+
+  .col-actions {
+    display: flex; gap: 8px; margin-bottom: 12px; align-items: center;
+  }
+  .col-actions .col-count { font-size: 0.82rem; color: #718096; margin-left: auto; }
+
+  .btn-sm {
+    font-size: 0.78rem; font-weight: 600;
+    padding: 5px 12px; border-radius: 6px; cursor: pointer;
+    border: 1px solid #cbd5e0; background: white; color: #4a5568;
+    transition: all 0.15s;
+  }
+  .btn-sm:hover { border-color: #00A651; color: #00A651; background: #f0faf5; }
+  .btn-sm:disabled { opacity: 0.4; cursor: not-allowed; }
+
+  .col-group { margin-bottom: 18px; }
+  .col-group-header {
+    display: flex; align-items: center; justify-content: space-between;
+    margin-bottom: 8px; padding-bottom: 6px;
+    border-bottom: 2px solid #e2e8f0;
+  }
+  .col-group-title {
+    font-size: 0.78rem; font-weight: 700; letter-spacing: 0.06em;
+    text-transform: uppercase;
+  }
+  .col-group-title.deductions { color: #c05621; }
+  .col-group-title.earnings   { color: #2b6cb0; }
+  .col-group-meta { font-size: 0.78rem; color: #718096; }
+  .col-group-actions { display: flex; gap: 6px; }
+  .cols-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+    gap: 8px;
+    padding: 4px 2px;
+  }
+  .col-group-body { max-height: 320px; overflow-y: auto; padding-right: 2px; }
+  .col-category-label {
+    grid-column: 1 / -1;
+    display: flex; align-items: center; gap: 8px;
+    font-size: 0.7rem; font-weight: 700; letter-spacing: 0.08em;
+    text-transform: uppercase; color: #4a5568;
+    padding: 8px 4px 4px;
+    border-bottom: 1px solid #e2e8f0;
+    margin-top: 6px;
+    cursor: pointer;
+    user-select: none;
+  }
+  .col-category-label:first-child { margin-top: 0; }
+  .col-category-label input[type=checkbox] {
+    width: 13px; height: 13px; accent-color: #00A651;
+    cursor: pointer; flex-shrink: 0;
+  }
+  .col-group-collapsible .col-group-body { display: none; }
+  .col-group-collapsible.expanded .col-group-body { display: block; }
+  .col-group-toggle-icon { transition: transform 0.2s; display: inline-block; margin-right: 4px; font-style: normal; }
+  .col-group-collapsible .col-group-toggle-icon { transform: rotate(-90deg); }
+  .col-group-collapsible.expanded .col-group-toggle-icon { transform: rotate(0deg); }
+  .col-item {
+    display: flex; align-items: center; gap: 6px;
+    padding: 5px 10px;
+    border: 1px solid #e2e8f0;
+    border-radius: 6px;
+    cursor: pointer;
+    transition: border-color 0.15s, background 0.15s;
+    font-size: 0.8rem;
+  }
+  .col-item:hover { border-color: #00A651; background: #f0faf5; }
+  .col-item input[type=checkbox] { width: 14px; height: 14px; accent-color: #00A651; cursor: pointer; flex-shrink: 0; }
+  .col-item label { cursor: pointer; color: #2d3748; line-height: 1.3; }
+  .col-item.checked { border-color: #9ae6b4; background: #f0faf5; }
+  .col-item.disabled { opacity: 0.45; pointer-events: none; }
+
+  /* Step 3 */
+  #step3 { display: none; }
+
+  .toggle-row {
+    display: flex; align-items: flex-start; gap: 14px;
+    padding: 14px 16px;
+    border: 1px solid #e2e8f0;
+    border-radius: 8px;
+    cursor: pointer;
+    transition: border-color 0.15s;
+  }
+  .toggle-row:hover { border-color: #00A651; }
+
+  .toggle-switch {
+    position: relative; width: 42px; height: 24px; flex-shrink: 0; margin-top: 1px;
+  }
+  .toggle-switch input { opacity: 0; width: 0; height: 0; }
+  .toggle-slider {
+    position: absolute; cursor: pointer; inset: 0;
+    background: #cbd5e0; border-radius: 24px;
+    transition: background 0.2s;
+  }
+  .toggle-slider::before {
+    content: ''; position: absolute;
+    width: 18px; height: 18px; left: 3px; bottom: 3px;
+    background: white; border-radius: 50%;
+    transition: transform 0.2s;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.2);
+  }
+  .toggle-switch input:checked + .toggle-slider { background: #00A651; }
+  .toggle-switch input:checked + .toggle-slider::before { transform: translateX(18px); }
+
+  .toggle-text strong { font-size: 0.9rem; font-weight: 600; color: #2d3748; }
+  .toggle-text p { font-size: 0.8rem; color: #718096; margin-top: 2px; }
+
+  /* Process button */
+  #process-btn {
+    display: block;
+    width: 100%;
+    padding: 14px;
+    background: #00A651;
+    color: white;
+    font-size: 1rem;
+    font-weight: 700;
+    border: none;
+    border-radius: 10px;
+    cursor: pointer;
+    margin-top: 8px;
+    transition: background 0.2s, transform 0.1s;
+    letter-spacing: 0.3px;
+  }
+  #process-btn:hover { background: #008f45; }
+  #process-btn:active { transform: scale(0.99); }
+  #process-btn:disabled { background: #a0aec0; cursor: not-allowed; transform: none; }
+
+  /* Status */
+  #status {
+    display: none;
+    margin-top: 16px;
+    padding: 12px 16px;
+    border-radius: 8px;
+    font-size: 0.87rem;
+    font-weight: 500;
+    align-items: center;
+    gap: 10px;
+  }
+  #status.info { background: #ebf8ff; border: 1px solid #90cdf4; color: #2b6cb0; display: flex; }
+  #status.success { background: #f0fff4; border: 1px solid #9ae6b4; color: #276749; display: flex; }
+  #status.error { background: #fff5f5; border: 1px solid #feb2b2; color: #c53030; display: flex; }
+
+  .spinner {
+    width: 16px; height: 16px; border: 2px solid currentColor;
+    border-top-color: transparent; border-radius: 50%;
+    animation: spin 0.7s linear infinite; flex-shrink: 0;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  /* Scrollbar */
+  .cols-grid::-webkit-scrollbar { width: 6px; }
+  .cols-grid::-webkit-scrollbar-track { background: #f7fafc; border-radius: 3px; }
+  .cols-grid::-webkit-scrollbar-thumb { background: #cbd5e0; border-radius: 3px; }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>Payroll Register Formatter</h1>
+  <p>Reformat your payroll register — apply negative values, split into Earnings &amp; Deductions sheets.</p>
+</header>
+
+<div class="container">
+
+  <!-- Step 1: Upload -->
+  <div class="card">
+    <div class="step-label"><span class="step-badge">1</span> Upload Payroll Register</div>
+
+    <div id="upload-area">
+      <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+        <polyline points="17 8 12 3 7 8"/>
+        <line x1="12" y1="3" x2="12" y2="15"/>
+      </svg>
+      <div class="upload-title">Drag &amp; drop your file here</div>
+      <div class="upload-sub">or click to browse — .xlsx files only</div>
+      <input type="file" id="file-input" accept=".xlsx">
+    </div>
+
+    <div id="file-info">
+      <svg class="fi-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/>
+      </svg>
+      <span class="fi-name" id="fi-name"></span>
+      <span class="fi-meta" id="fi-meta"></span>
+      <button class="fi-clear" id="fi-clear" title="Remove file">×</button>
+    </div>
+  </div>
+
+  <!-- Step 2: Column selection -->
+  <div class="card" id="step2">
+    <div class="step-label"><span class="step-badge">2</span> Choose columns to make negative</div>
+
+    <div class="keep-as-is-row" id="kai-row">
+      <input type="checkbox" id="keep-as-is">
+      <div>
+        <label for="keep-as-is">Keep as-is (no negatives)</label>
+        <div class="kai-sub">When checked, all values remain positive — column selection is disabled.</div>
+      </div>
+    </div>
+
+    <span class="col-count" id="col-count"></span>
+
+    <!-- Deductions group -->
+    <div class="col-group" id="group-deductions">
+      <div class="col-group-header">
+        <span class="col-group-title deductions">Deductions <span id="ded-count"></span></span>
+      </div>
+      <div class="col-group-body">
+        <div class="cols-grid" id="cols-grid-ded"></div>
+      </div>
+    </div>
+
+    <!-- Earnings & Other group — collapsed by default -->
+    <div class="col-group col-group-collapsible" id="group-earnings">
+      <div class="col-group-header" id="earn-group-header" style="cursor:pointer;">
+        <span class="col-group-title earnings"><i class="col-group-toggle-icon">▼</i>Earnings &amp; Other <span id="earn-count"></span></span>
+      </div>
+      <div class="col-group-body">
+        <div class="cols-grid" id="cols-grid-earn"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Step 3: Options -->
+  <div class="card" id="step3">
+    <div class="step-label"><span class="step-badge">3</span> Split into sheets (Earnings / Deductions)</div>
+
+    <label class="toggle-row">
+      <span class="toggle-switch">
+        <input type="checkbox" id="split-toggle">
+        <span class="toggle-slider"></span>
+      </span>
+      <span class="toggle-text">
+        <strong>Split into sheets (Earnings / Deductions)</strong>
+        <p>Creates two additional sheets in vertical format: one for earnings, one for deductions. The original Payroll Register sheet is always included.</p>
+      </span>
+    </label>
+
+    <!-- Earnings column selector — shown when split is enabled -->
+    <div id="earnings-selector" style="display:none; margin-top:20px;">
+      <div class="col-group-header" style="margin-bottom:8px; padding-bottom:6px; border-bottom:2px solid #e2e8f0;">
+        <span class="col-group-title earnings">Earnings sheet columns <span id="earn-sel-count"></span></span>
+      </div>
+      <p class="desc" style="margin-bottom:10px;">OT/ND/RD overtime columns are excluded. Pre-checked items are recommended earnings to include.</p>
+      <div class="col-group-body">
+        <div class="cols-grid" id="cols-grid-earn-sel"></div>
+      </div>
+      <!-- Deductions column selector -->
+      <div style="margin-top:20px;">
+        <div class="col-group-header" style="margin-bottom:8px; padding-bottom:6px; border-bottom:2px solid #e2e8f0;">
+          <span class="col-group-title deductions">Deductions sheet columns <span id="ded-sel-count"></span></span>
+        </div>
+        <p class="desc" style="margin-bottom:10px;">Pre-checked from your Step 2 selections. Adjust as needed.</p>
+        <div class="col-group-body">
+          <div class="cols-grid" id="cols-grid-ded-sel"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Process -->
+  <div class="card">
+    <button id="process-btn" disabled>Process &amp; Download</button>
+    <div id="status"></div>
+  </div>
+
+</div>
+
+<script>
+(function () {
+  'use strict';
+
+  // ─── State ───────────────────────────────────────────────────────────────
+  let workbook = null;
+  let originalFileName = '';
+  let numericColumns = []; // [{header, colIndex, isDeduction}]
+  let earningsSelColumns = []; // [{header, colIndex, preChecked}] for the split earnings selector
+  let deductionsSelColumns = []; // [{header, colIndex}] for the split deductions selector
+
+  // ─── DOM refs ────────────────────────────────────────────────────────────
+  const uploadArea   = document.getElementById('upload-area');
+  const fileInput    = document.getElementById('file-input');
+  const fileInfo     = document.getElementById('file-info');
+  const fiName       = document.getElementById('fi-name');
+  const fiMeta       = document.getElementById('fi-meta');
+  const fiClear      = document.getElementById('fi-clear');
+  const step2        = document.getElementById('step2');
+  const step3        = document.getElementById('step3');
+  const keepAsIs     = document.getElementById('keep-as-is');
+  const colCount     = document.getElementById('col-count');
+  const splitToggle  = document.getElementById('split-toggle');
+  const processBtn   = document.getElementById('process-btn');
+  const statusEl     = document.getElementById('status');
+
+  // ─── Upload handling ─────────────────────────────────────────────────────
+  uploadArea.addEventListener('click', () => fileInput.click());
+  uploadArea.addEventListener('dragover', e => { e.preventDefault(); uploadArea.classList.add('drag-over'); });
+  uploadArea.addEventListener('dragleave', () => uploadArea.classList.remove('drag-over'));
+  uploadArea.addEventListener('drop', e => {
+    e.preventDefault();
+    uploadArea.classList.remove('drag-over');
+    const f = e.dataTransfer.files[0];
+    if (f) handleFile(f);
+  });
+  fileInput.addEventListener('change', () => {
+    if (fileInput.files[0]) handleFile(fileInput.files[0]);
+  });
+  fiClear.addEventListener('click', resetAll);
+
+  function handleFile(file) {
+    if (!file.name.endsWith('.xlsx')) {
+      showStatus('error', 'Please upload an .xlsx file.');
+      return;
+    }
+    originalFileName = file.name;
+    fiName.textContent = file.name;
+    fiMeta.textContent = (file.size / 1024).toFixed(1) + ' KB';
+    fileInfo.style.display = 'flex';
+    showStatus('info', '<span class="spinner"></span> Reading file…');
+
+    const reader = new FileReader();
+    reader.onload = e => {
+      try {
+        workbook = XLSX.read(new Uint8Array(e.target.result), { type: 'array', cellStyles: true });
+        parseColumns();
+        hideStatus();
+      } catch (err) {
+        showStatus('error', 'Failed to read file: ' + err.message);
+      }
+    };
+    reader.readAsArrayBuffer(file);
+  }
+
+  // ─── Parse columns from the payroll sheet ────────────────────────────────
+  function parseColumns() {
+    const sheetName = workbook.SheetNames[0];
+    const ws = workbook.Sheets[sheetName];
+    const data = XLSX.utils.sheet_to_json(ws, { header: 1, defval: null });
+
+    // Row index 3 (0-based) has headers
+    const headerRow = data[3] || [];
+    const HEADER_ROW_IDX = 3;
+
+    // Find numeric columns: scan data rows (index 5+)
+    // Skip department label rows (col A starts with "Department") and blank rows
+    const numericColSet = new Set();
+
+    for (let r = 5; r < data.length; r++) {
+      const row = data[r];
+      if (!row || row.every(c => c === null || c === '')) continue;
+      const colA = String(row[0] || '').trim();
+      // Skip dept label rows
+      if (colA.toLowerCase().startsWith('department')) continue;
+
+      for (let c = 1; c < row.length; c++) {
+        const v = row[c];
+        if (typeof v === 'number' && isFinite(v)) {
+          numericColSet.add(c);
+        } else if (typeof v === 'string') {
+          const parsed = parseFloat(v.replace(/,/g, ''));
+          if (!isNaN(parsed)) numericColSet.add(c);
+        }
+      }
+    }
+
+    numericColumns = [];
+    for (let c = 0; c < headerRow.length; c++) {
+      const h = String(headerRow[c] || '').trim();
+      if (!h) continue;
+      if (!numericColSet.has(c)) continue;
+      if (h.toLowerCase().includes('(hh:mm)')) continue;
+      numericColumns.push({ header: h, colIndex: c, isDeduction: shouldPrecheck(h) });
+    }
+
+    buildCheckboxPanel();
+    if (splitToggle.checked) {
+      buildEarningsSelectorPanel();
+      buildDeductionsSelectorPanel();
+    }
+    step2.style.display = 'block';
+    step3.style.display = 'block';
+    processBtn.disabled = false;
+  }
+
+  // ─── Categorization helpers ───────────────────────────────────────────────
+  const EXACT_PRECHECK     = new Set(['withholding tax','sss','sss mpf','philhealth','hdmf']);
+  const NO_PRECHECK_EXACT  = new Set(['ssser','sss mpfer','sssec','pher','hdmfer','hdmf additional']);
+
+  function shouldPrecheck(header) {
+    const h = header.toLowerCase().trim();
+    if (NO_PRECHECK_EXACT.has(h)) return false;
+    if (h.includes('deduction') || h.includes('(less)')) return true;
+    if (EXACT_PRECHECK.has(h)) return true;
+    return false;
+  }
+
+  function deductionCategory(header) {
+    const h = header.toLowerCase().trim();
+    if (EXACT_PRECHECK.has(h)) return 'Government';
+    if (h.includes('(less)')) return 'Loans & Others';
+    if (h === 'deductions total') return 'Summary';
+    return 'Absence & Late'; // absent, late, deminimis, discretionary deductions
+  }
+
+  function earningCategory(header) {
+    const h = header.toLowerCase().trim();
+    if (h.includes('basic salary') || h.includes('de minimis') || h.includes('total salary')) return 'Salary';
+    const ALLOW_KEYS = ['allowance','commission','pay','bonus','incentive','adjustment',
+                        'reliever','housing','repairs','veterinarian','sales','refund'];
+    if (ALLOW_KEYS.some(k => h.includes(k))) return 'Allowances';
+    return 'Others';
+  }
+
+  // Render a group of col items into a grid with category subheadings, sorted alpha within category
+  function renderCategorized(grid, items, categoryFn, checkedFn, dataAttr, onChangeFn) {
+    grid.innerHTML = '';
+    const byCategory = {};
+    items.forEach((col, i) => {
+      const cat = categoryFn(col.header);
+      if (!byCategory[cat]) byCategory[cat] = [];
+      byCategory[cat].push({ col, i });
+    });
+    const CAT_ORDER = ['Government','Salary','Absence & Late','Allowances','Loans & Others','Others','Summary'];
+    const sortedCats = Object.keys(byCategory).sort((a, b) => {
+      const ai = CAT_ORDER.indexOf(a), bi = CAT_ORDER.indexOf(b);
+      return (ai === -1 ? 99 : ai) - (bi === -1 ? 99 : bi);
+    });
+
+    sortedCats.forEach(cat => {
+      // Category header with parent checkbox
+      const catLabel = document.createElement('div');
+      catLabel.className = 'col-category-label';
+
+      const catCb = document.createElement('input');
+      catCb.type = 'checkbox';
+      const catSpan = document.createElement('span');
+      catSpan.textContent = cat;
+      catLabel.appendChild(catCb);
+      catLabel.appendChild(catSpan);
+      grid.appendChild(catLabel);
+
+      // Item rows
+      const itemEls = [];
+      byCategory[cat]
+        .sort((a, b) => a.col.header.localeCompare(b.col.header))
+        .forEach(({ col, i }) => {
+          const preChecked = checkedFn(col);
+          const item = document.createElement('label');
+          item.className = 'col-item' + (preChecked ? ' checked' : '');
+          item.dataset[dataAttr] = i;
+
+          const cb = document.createElement('input');
+          cb.type = 'checkbox';
+          cb.checked = preChecked;
+          cb.dataset[dataAttr] = i;
+          cb.addEventListener('change', () => {
+            item.classList.toggle('checked', cb.checked);
+            updateCatCheckbox(catCb, itemEls);
+            onChangeFn();
+          });
+
+          const lbl = document.createElement('span');
+          lbl.textContent = col.header;
+          item.appendChild(cb); item.appendChild(lbl);
+          grid.appendChild(item);
+          itemEls.push(cb);
+        });
+
+      // Set initial state of category checkbox
+      updateCatCheckbox(catCb, itemEls);
+
+      // Category checkbox click handler
+      catCb.addEventListener('change', () => {
+        const val = catCb.checked;
+        itemEls.forEach(cb => {
+          cb.checked = val;
+          cb.closest('.col-item').classList.toggle('checked', val);
+        });
+        catCb.indeterminate = false;
+        onChangeFn();
+      });
+
+      // Clicking the label text also toggles the checkbox
+      catSpan.addEventListener('click', () => catCb.click());
+    });
+  }
+
+  function updateCatCheckbox(catCb, itemCbs) {
+    const total = itemCbs.length;
+    const checked = itemCbs.filter(cb => cb.checked).length;
+    if (checked === 0) { catCb.checked = false; catCb.indeterminate = false; }
+    else if (checked === total) { catCb.checked = true; catCb.indeterminate = false; }
+    else { catCb.checked = false; catCb.indeterminate = true; }
+  }
+
+  const colsGridDed  = document.getElementById('cols-grid-ded');
+  const colsGridEarn = document.getElementById('cols-grid-earn');
+  const dedCount     = document.getElementById('ded-count');
+  const earnCount    = document.getElementById('earn-count');
+
+  function buildCheckboxPanel() {
+    const dedCols  = numericColumns.filter(c => c.isDeduction);
+    const earnCols = numericColumns.filter(c => !c.isDeduction);
+
+    renderCategorized(colsGridDed,  dedCols,  deductionCategory, c => c.isDeduction, 'idx',
+      updateColCount);
+    renderCategorized(colsGridEarn, earnCols, earningCategory,   () => false,        'idx',
+      updateColCount);
+
+    // Patch data-idx to match numericColumns global index
+    [colsGridDed, colsGridEarn].forEach(grid => {
+      grid.querySelectorAll('.col-item input[type=checkbox]').forEach(cb => {
+        const header = cb.closest('.col-item')?.querySelector('span').textContent;
+        const globalIdx = numericColumns.findIndex(c => c.header === header);
+        if (globalIdx !== -1) cb.dataset.idx = globalIdx;
+      });
+    });
+
+    updateColCount();
+  }
+
+  function updateColCount() {
+    const allCbs = document.querySelectorAll('#cols-grid-ded .col-item input[type=checkbox], #cols-grid-earn .col-item input[type=checkbox]');
+    const total   = allCbs.length;
+    const checked = [...allCbs].filter(cb => cb.checked).length;
+    colCount.textContent = `${checked} of ${total} selected`;
+
+    const dedCbs = colsGridDed.querySelectorAll('.col-item input[type=checkbox]');
+    dedCount.textContent = `(${[...dedCbs].filter(c=>c.checked).length}/${dedCbs.length})`;
+
+    const earnCbs = colsGridEarn.querySelectorAll('.col-item input[type=checkbox]');
+    earnCount.textContent = `(${[...earnCbs].filter(c=>c.checked).length}/${earnCbs.length})`;
+  }
+
+  // Collapse/expand Earnings & Other group in Step 2
+  document.getElementById('earn-group-header').addEventListener('click', () => {
+    document.getElementById('group-earnings').classList.toggle('expanded');
+  });
+
+  keepAsIs.addEventListener('change', () => {
+    const hidden = keepAsIs.checked;
+    document.getElementById('group-deductions').style.display = hidden ? 'none' : 'block';
+    document.getElementById('group-earnings').style.display   = hidden ? 'none' : 'block';
+    colCount.style.display = hidden ? 'none' : '';
+  });
+
+  // ─── Earnings split selector ─────────────────────────────────────────────
+  const earningsSelector  = document.getElementById('earnings-selector');
+  const colsGridEarnSel   = document.getElementById('cols-grid-earn-sel');
+  const earnSelCount      = document.getElementById('earn-sel-count');
+
+  // Patterns that mark a column as OT/ND/RD — hidden entirely from earnings selector
+  function isOTColumn(header) {
+    const h = header.trim();
+    return /^(Ord|RD|LH|DH|SH)-/i.test(h) || /-(OT|ND|RD)\b/i.test(h) ||
+           /\bOT Total\b/i.test(h) || /^RD$/i.test(h) || /^LH$/i.test(h);
+  }
+
+  // Pre-check logic for earnings selector
+  function shouldPreCheckEarning(header) {
+    const h = header.toLowerCase().trim();
+    const SKIP = ['gross/day','basic/hr','work days','basic monthly salary','total monthly salary',
+                  'monthly de minimis','net pay','tax ytd','net ytd','taxable gross',
+                  '13th month','hdmf additional','ssser','sss mpfer','sssec','pher','hdmfer',
+                  'assumed 13th','net ytd','taxable gross'];
+    if (SKIP.some(s => h.includes(s))) return false;
+    const YES = ['allowance','commission','salary','de minimis','bonus','incentive',
+                 'adjustment','reliever','housing','repairs','veterinarian','sales',
+                 'hazard','refund','total salary'];
+    return YES.some(s => h.includes(s));
+  }
+
+  function buildEarningsSelectorPanel() {
+    earningsSelColumns = [];
+    numericColumns.forEach((col, globalIdx) => {
+      if (col.isDeduction) return;
+      if (isOTColumn(col.header)) return;
+      earningsSelColumns.push({ header: col.header, colIndex: col.colIndex, globalIdx });
+    });
+
+    renderCategorized(
+      colsGridEarnSel, earningsSelColumns, earningCategory,
+      col => shouldPreCheckEarning(col.header), 'earnIdx', updateEarnSelCount
+    );
+    updateEarnSelCount();
+  }
+
+  function updateEarnSelCount() {
+    const cbs = colsGridEarnSel.querySelectorAll('.col-item input[type=checkbox]');
+    earnSelCount.textContent = `(${[...cbs].filter(c=>c.checked).length}/${cbs.length})`;
+  }
+
+  splitToggle.addEventListener('change', () => {
+    const on = splitToggle.checked;
+    earningsSelector.style.display = on ? 'block' : 'none';
+    if (on && numericColumns.length > 0) {
+      buildEarningsSelectorPanel();
+      buildDeductionsSelectorPanel();
+    }
+  });
+
+
+  // ─── Deductions split selector ───────────────────────────────────────────
+  const colsGridDedSel = document.getElementById('cols-grid-ded-sel');
+  const dedSelCount    = document.getElementById('ded-sel-count');
+
+  function buildDeductionsSelectorPanel() {
+    deductionsSelColumns = [];
+    numericColumns.forEach((col, globalIdx) => {
+      if (!col.isDeduction) return;
+      deductionsSelColumns.push({ header: col.header, colIndex: col.colIndex, globalIdx });
+    });
+
+    // Mirror Step 2 checked state
+    const step2CheckedSet = new Set(
+      [...colsGridDed.querySelectorAll('.col-item input[type=checkbox]:checked')]
+        .map(cb => numericColumns[parseInt(cb.dataset.idx)]?.colIndex)
+        .filter(v => v !== undefined)
+    );
+
+    renderCategorized(
+      colsGridDedSel, deductionsSelColumns, deductionCategory,
+      col => step2CheckedSet.size > 0 ? step2CheckedSet.has(col.colIndex) : true,
+      'dedSelIdx', updateDedSelCount
+    );
+    updateDedSelCount();
+  }
+
+  function updateDedSelCount() {
+    const cbs = colsGridDedSel.querySelectorAll('.col-item input[type=checkbox]');
+    dedSelCount.textContent = `(${[...cbs].filter(c=>c.checked).length}/${cbs.length})`;
+  }
+
+
+  // ─── Reset ────────────────────────────────────────────────────────────────
+  function resetAll() {
+    workbook = null;
+    originalFileName = '';
+    numericColumns = [];
+    fileInfo.style.display = 'none';
+    fileInput.value = '';
+    step2.style.display = 'none';
+    step3.style.display = 'none';
+    processBtn.disabled = true;
+    colsGridDed.innerHTML = '';
+    colsGridEarn.innerHTML = '';
+    colsGridEarnSel.innerHTML = '';
+    colsGridDedSel.innerHTML = '';
+    earningsSelColumns = [];
+    deductionsSelColumns = [];
+    keepAsIs.checked = false;
+    splitToggle.checked = false;
+    earningsSelector.style.display = 'none';
+    hideStatus();
+  }
+
+  // ─── Process & Download ───────────────────────────────────────────────────
+  processBtn.addEventListener('click', processFile);
+
+  function processFile() {
+    if (!workbook) return;
+    showStatus('info', '<span class="spinner"></span> Processing…');
+    processBtn.disabled = true;
+
+    setTimeout(() => {
+      try {
+        const result = buildOutput();
+        downloadWorkbook(result);
+        showStatus('success', '✓ File processed and downloaded successfully!');
+      } catch (err) {
+        showStatus('error', 'Error during processing: ' + err.message);
+        console.error(err);
+      }
+      processBtn.disabled = false;
+    }, 50);
+  }
+
+  function buildOutput() {
+    const noNeg = keepAsIs.checked;
+    const doSplit = splitToggle.checked;
+
+    // Columns to negate (set of colIndex)
+    const negSet = new Set();
+    if (!noNeg) {
+      document.querySelectorAll('#cols-grid-ded .col-item input[type=checkbox]:checked, #cols-grid-earn .col-item input[type=checkbox]:checked').forEach(cb => {
+        const idx = parseInt(cb.dataset.idx);
+        negSet.add(numericColumns[idx].colIndex);
+      });
+    }
+
+    const srcSheetName = workbook.SheetNames[0];
+    const srcWs = workbook.Sheets[srcSheetName];
+
+    const newWb = XLSX.utils.book_new();
+
+    // Always include the main sheet (with negatives applied in-place on a clone)
+    const mainWs = applyNegativesToSheet(srcWs, negSet);
+    autoFitColumns(mainWs);
+    XLSX.utils.book_append_sheet(newWb, mainWs, srcSheetName);
+
+    // If split enabled, add Earnings and Deductions as extra sheets
+    if (doSplit) {
+      const data = XLSX.utils.sheet_to_json(srcWs, { header: 1, defval: null });
+
+      // Earnings: user-selected columns from the earnings selector
+      const earningsColIdxs = [];
+      colsGridEarnSel.querySelectorAll('.col-item input[type=checkbox]:checked').forEach(cb => {
+        const i = parseInt(cb.dataset.earnIdx);
+        if (!isNaN(i) && earningsSelColumns[i]) earningsColIdxs.push(earningsSelColumns[i].colIndex);
+      });
+
+      // Deductions: user-selected columns from the Step 3 deductions selector
+      const deductionColIdxs = [];
+      colsGridDedSel.querySelectorAll('.col-item input[type=checkbox]:checked').forEach(cb => {
+        const i = parseInt(cb.dataset.dedSelIdx);
+        if (!isNaN(i) && deductionsSelColumns[i]) deductionColIdxs.push(deductionsSelColumns[i].colIndex);
+      });
+
+      const wsE = buildSplitSheet(data, earningsColIdxs, negSet);
+      const wsD = buildSplitSheet(data, deductionColIdxs, negSet);
+      XLSX.utils.book_append_sheet(newWb, wsE, 'Earnings');
+      XLSX.utils.book_append_sheet(newWb, wsD, 'Deductions');
+    }
+
+    // Copy all remaining sheets unchanged (e.g. Retro Adjs)
+    for (let i = 1; i < workbook.SheetNames.length; i++) {
+      const sn = workbook.SheetNames[i];
+      XLSX.utils.book_append_sheet(newWb, workbook.Sheets[sn], sn);
+    }
+
+    return newWb;
+  }
+
+  // Deep-clone a worksheet and negate selected columns in-place, preserving all layout
+  function applyNegativesToSheet(ws, negSet) {
+    const clone = JSON.parse(JSON.stringify(ws));
+    if (negSet.size === 0) return clone;
+
+    const range = XLSX.utils.decode_range(clone['!ref']);
+    const HEADER_ROW = 3; // 0-based
+
+    for (let r = HEADER_ROW + 2; r <= range.e.r; r++) {  // skip metadata + header + blank row
+      // Get col A to detect dept label rows
+      const colAAddr = XLSX.utils.encode_cell({ r, c: 0 });
+      const colACell = clone[colAAddr];
+      const colAVal = colACell ? String(colACell.v || '').trim().toLowerCase() : '';
+      if (colAVal.startsWith('department')) continue;
+
+      for (const c of negSet) {
+        if (c > range.e.c) continue;
+        const addr = XLSX.utils.encode_cell({ r, c });
+        const cell = clone[addr];
+        if (!cell) continue;
+
+        let num = null;
+        if (cell.t === 'n' && typeof cell.v === 'number') {
+          num = cell.v;
+        } else if ((cell.t === 's' || cell.t === 'str') && typeof cell.v === 'string' && cell.v.trim() !== '') {
+          const parsed = parseFloat(cell.v.replace(/,/g, ''));
+          if (!isNaN(parsed)) num = parsed;
+        }
+
+        if (num !== null) {
+          const negVal = -Math.abs(num);
+          cell.v = negVal;
+          cell.t = 'n';
+          // Update the formatted string too if present
+          if (cell.w !== undefined) {
+            cell.w = negVal.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+          }
+        }
+      }
+    }
+    return clone;
+  }
+
+  function negateVal(v) {
+    if (typeof v === 'number' && isFinite(v)) return -Math.abs(v);
+    if (typeof v === 'string' && v.trim() !== '') {
+      const p = parseFloat(v.replace(/,/g, ''));
+      if (!isNaN(p)) return -Math.abs(p);
+    }
+    return v;
+  }
+
+  // Build a vertical split sheet: one section per column type, rows = employees with non-zero values
+  function buildSplitSheet(data, colIdxs, negSet) {
+    const headerRow = data[3] || [];
+
+    // Extract employee data rows only (skip metadata, dept labels, subtotals, totals, blanks)
+    const employeeRows = [];
+    for (let r = 5; r < data.length; r++) {
+      const row = data[r];
+      if (!row) continue;
+      const colA = String(row[0] || '').trim().toLowerCase();
+      if (!colA) continue;
+      if (colA.startsWith('department')) continue;
+      if (colA === 'sub total' || colA === 'total') continue;
+      employeeRows.push(row);
+    }
+
+    // Get payroll period string from row 1
+    const periodCell = data[1] ? String(data[1][1] || data[1][0] || '').trim() : '';
+
+    // Identifier column indices (Employee ID = 0, Fullname = 1)
+    const ID_COL = 0;
+    const NAME_COL = 1;
+
+    // Determine which colIdxs are data columns (not identifiers)
+    const IDENT_SET = new Set([ID_COL, NAME_COL]);
+    const dataColIdxs = colIdxs.filter(c => !IDENT_SET.has(c));
+
+    // Output rows array and merge info for section headers
+    const rows = [];
+    const boldRows = new Set();   // row indices to bold (section headers + column headers)
+    const totalRows = new Set();  // row indices that are Total rows
+    const merges = [];
+
+    // Row 0: Payroll Period
+    rows.push([`Payroll Period: ${periodCell}`, null, null, null]);
+    boldRows.add(0);
+
+    // Row 1: blank
+    rows.push([null, null, null, null]);
+
+    // Row 2: column headers
+    rows.push(['ECN #', 'Employee Name', 'Particulars', 'Amount']);
+    boldRows.add(2);
+
+    for (const c of dataColIdxs) {
+      const typeName = String(headerRow[c] || '').trim();
+      if (!typeName) continue;
+
+      // Collect employees with non-zero value for this column
+      const typeRows = [];
+      for (const empRow of employeeRows) {
+        const raw = empRow[c];
+        let num = null;
+        if (typeof raw === 'number' && isFinite(raw)) num = raw;
+        else if (typeof raw === 'string' && raw.trim() !== '') {
+          const p = parseFloat(raw.replace(/,/g, ''));
+          if (!isNaN(p)) num = p;
+        }
+        if (num === null || num === 0) continue;
+        const finalVal = negSet.has(c) ? -Math.abs(num) : num;
+        typeRows.push([
+          empRow[ID_COL] ?? '',
+          empRow[NAME_COL] ?? '',
+          typeName,
+          finalVal
+        ]);
+      }
+
+      if (typeRows.length === 0) continue; // skip types with no data
+
+      // Section header row (bold, spans all 4 cols)
+      const secHeaderIdx = rows.length;
+      rows.push([typeName.toUpperCase(), null, null, null]);
+      boldRows.add(secHeaderIdx);
+      merges.push({ s: { r: secHeaderIdx, c: 0 }, e: { r: secHeaderIdx, c: 3 } });
+
+      // Employee rows
+      for (const tr of typeRows) rows.push(tr);
+
+      // Total row
+      const total = typeRows.reduce((sum, tr) => sum + (typeof tr[3] === 'number' ? tr[3] : 0), 0);
+      const totalIdx = rows.length;
+      rows.push([null, null, 'Total', total]);
+      totalRows.add(totalIdx);
+
+      // Blank separator
+      rows.push([null, null, null, null]);
+    }
+
+    const ws = XLSX.utils.aoa_to_sheet(rows);
+    ws['!merges'] = merges;
+
+    // Apply bold to section headers and column header row using cell styles
+    for (const rIdx of boldRows) {
+      for (let c = 0; c < 4; c++) {
+        const addr = XLSX.utils.encode_cell({ r: rIdx, c });
+        if (!ws[addr]) ws[addr] = { t: 's', v: '' };
+        ws[addr].s = { font: { bold: true } };
+      }
+    }
+    // Right-align Total label
+    for (const rIdx of totalRows) {
+      const addrLabel = XLSX.utils.encode_cell({ r: rIdx, c: 2 });
+      if (ws[addrLabel]) ws[addrLabel].s = { font: { bold: true }, alignment: { horizontal: 'right' } };
+    }
+
+    autoFitColumns(ws);
+    return ws;
+  }
+
+  function downloadWorkbook(wb) {
+    const baseName = originalFileName.replace(/\.xlsx$/i, '');
+    const outName = baseName + '_formatted.xlsx';
+    XLSX.writeFile(wb, outName, { bookType: 'xlsx', type: 'array' });
+  }
+
+  // ─── Status helpers ───────────────────────────────────────────────────────
+  function showStatus(type, html) {
+    statusEl.className = type;
+    statusEl.innerHTML = html;
+    statusEl.style.display = 'flex';
+  }
+  function hideStatus() {
+    statusEl.style.display = 'none';
+    statusEl.className = '';
+    statusEl.innerHTML = '';
+  }
+
+  // Set column widths based on longest cell content in each column
+  function autoFitColumns(ws) {
+    const range = XLSX.utils.decode_range(ws['!ref'] || 'A1');
+    const colWidths = [];
+
+    for (let c = range.s.c; c <= range.e.c; c++) {
+      let maxLen = 6; // minimum width
+      for (let r = range.s.r; r <= range.e.r; r++) {
+        const addr = XLSX.utils.encode_cell({ r, c });
+        const cell = ws[addr];
+        if (!cell) continue;
+        const text = cell.w !== undefined ? cell.w : (cell.v !== undefined ? String(cell.v) : '');
+        if (text.length > maxLen) maxLen = text.length;
+      }
+      // Cap at 40 chars, add small padding
+      colWidths[c] = { wch: Math.min(maxLen + 2, 42) };
+    }
+    ws['!cols'] = colWidths;
+  }
+
+})();
+</script>
+</body>
+</html>
